@@ -1,0 +1,13 @@
+{
+  "name": "reno-air-club-vds-quiz",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node serve.mjs",
+    "test": "node --test engine.test.mjs"
+  }
+}
