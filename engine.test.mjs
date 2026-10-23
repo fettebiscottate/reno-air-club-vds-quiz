@@ -1,8 +1,23 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync,existsSync} from 'node:fs';
-import {sample,score,remaining,EXAM_MS} from './engine.mjs';
+import {sample,sampleExam,EXAM_DISTRIBUTION,score,remaining,EXAM_MS} from './engine.mjs';
 const db=JSON.parse(readFileSync(new URL('./database.json',import.meta.url),'utf8'));
+
+test('esame con quote fisse, argomenti ordinati e domande casuali senza duplicati',()=>{
+  const counts=[11,11,11,14,3,7,7,3,3];
+  assert.deepEqual(EXAM_DISTRIBUTION.map(q=>q.percent),[15,15,15,20,5,10,10,5,5]);
+  assert.deepEqual(EXAM_DISTRIBUTION.map(q=>q.count),counts);
+  const expected=counts.flatMap((count,i)=>Array(count).fill(i+1));
+  for(let i=0;i<100;i++){
+    const qs=sampleExam(db.questions);
+    assert.equal(qs.length,70);
+    assert.equal(new Set(qs.map(q=>q.id)).size,70);
+    assert.deepEqual(qs.map(q=>q.topic),expected);
+  }
+  assert.notDeepEqual(sampleExam(db.questions,()=>0).map(q=>q.id),sampleExam(db.questions,()=>0.999).map(q=>q.id));
+  assert.throws(()=>sampleExam(db.questions.filter(q=>q.topic!==5)));
+});
 test('database completo: ID univoci, opzioni, correttori e figure',()=>{assert.equal(db.topics.length,9);assert.equal(new Set(db.questions.map(q=>q.id)).size,db.questions.length);for(const t of db.topics)assert.equal(db.questions.filter(q=>q.topic===t.id).length,t.count);for(const q of db.questions){assert(q.text.length>5);assert(q.options.length>=2&&q.options.length<=4);assert(q.options.every(o=>o.length));assert(q.correct>=0&&q.correct<q.options.length);for(const img of q.images)assert(existsSync(new URL('./'+img,import.meta.url)));}});
 test('esame: 70 casuali senza duplicati; esercizio limitato ai temi scelti',()=>{for(let i=0;i<50;i++)assert.equal(new Set(sample(db.questions,70).map(q=>q.id)).size,70);const pool=db.questions.filter(q=>[2,7].includes(q.topic));assert(sample(pool,35).every(q=>[2,7].includes(q.topic)));assert.throws(()=>sample(pool,pool.length+1));assert.throws(()=>sample(pool,0));assert.throws(()=>sample(pool,1.5));});
 test('soglia esame: 7 errori ammessi, 8 respinto; omesse incluse',()=>{const qs=sample(db.questions,70);const a=Object.fromEntries(qs.slice(7).map(q=>[q.id,q.correct]));assert.deepEqual(score(qs,a),{correct:63,unanswered:7,errors:7,passed:true});delete a[qs[7].id];assert.equal(score(qs,a).passed,false);a[qs[7].id]=(qs[7].correct+1)%qs[7].options.length;assert.equal(score(qs,a).errors,8);});
